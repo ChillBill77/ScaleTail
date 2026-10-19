@@ -1,77 +1,41 @@
-# homebridge with Tailscale Sidecar
+# homebridge
 
-This Docker Compose configuration sets up [Homebridge](https://github.com/homebridge/homebridge) with Tailscale as a sidecar container. Homebridge emulates the iOS HomeKit API, enabling HomeKit integration for non-Apple smart home devices. The Homebridge UI is reachable **only over your Tailnet** via HTTPS.
+[Homebridge](https://github.com/homebridge/homebridge) emulates the Apple HomeKit API so non-HomeKit smart-home devices (Philips Hue, IKEA TRADFRI, and hundreds more) show up in the Apple Home app.
 
-## ⚠️ Critical Limitation
+This stack runs homebridge with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-**Homebridge requires `host` network mode for HomeKit mDNS discovery.** This sidecar configuration isolates Homebridge into a separate network namespace, which **breaks HomeKit discovery entirely**. HomeKit clients will not be able to find or control your devices.
+## At a glance
 
-**What works:**
-- Access the Homebridge UI web interface over HTTPS via Tailnet: `https://homebridge.your-tailnet.ts.net`
-- Install plugins, edit config, view logs
-- Full remote administration
+| Item          | Value                                   |
+| ------------- | --------------------------------------- |
+| Web interface | `https://homebridge.<tailnet>.ts.net`   |
+| Service port  | `8581`                                  |
+| Image         | `homebridge/homebridge:latest`          |
+| Data          | `./homebridge-data/`                    |
 
-**What doesn't work:**
-- HomeKit device discovery on your local network
-- HomeKit app integration from iPhone/iPad
-- Siri control via HomeKit
+## Before you start
 
-If you need HomeKit discovery, run Homebridge with `network_mode: host` instead (standard Docker setup, no Tailscale sidecar). If you only need the web UI for administration from Tailnet, proceed with this configuration.
+- A Tailscale auth key (see `.env`).
+- **HomeKit discovery does not work through the sidecar** — see "Deviations from the standard setup". This stack exposes the Homebridge web UI over your Tailnet for administration only.
 
-## About Homebridge
+## Deviations from the standard setup
 
-Homebridge is a lightweight Node.js server that emulates the HomeKit API. It translates between HomeKit and non-HomeKit smart home devices (Philips Hue, IKEA TRADFRI, etc.), allowing them to integrate into the Apple Home ecosystem. This image includes FFmpeg with libfdk-aac for camera streaming support.
+- **Serve port 8581** — the Homebridge UI listens on 8581, not 80, so the Serve proxy targets `http://127.0.0.1:8581`.
+- **`ENABLE_AVAHI=0`** — Avahi (mDNS) is disabled because the sidecar network namespace prevents mDNS broadcasts. HomeKit device discovery is therefore not possible in this stack; run Homebridge with `network_mode: host` (a plain Docker setup, no sidecar) if you need HomeKit app integration and Siri control.
+- **Data volume at `/homebridge`** — Homebridge keeps its configuration under `/homebridge`, not `/config`.
 
-## Architecture
+## First run
 
-- `tailscale`: Runs the Tailscale client, obtains a Tailnet IP, serves HTTPS on :443 proxying to Homebridge UI on internal port 8581.
-- `homebridge`: Runs in the **same network namespace** as the tailscale container. Configuration and plugins persist in a dedicated volume.
+On first start Homebridge prints a setup code to its logs; find it with:
 
-Access the UI at: `https://homebridge.your-tailnet.ts.net` (after auth and healthy state).
-
-## Prerequisites
-
-- Docker & Docker Compose v2.20+
-- Tailscale account + ability to create auth keys
-- Host user in `docker` group (or use sudo)
-- Pre-create volume directories (recommended):
-  ```bash
-  mkdir -p homebridge-data/config ts-homebridge-state
-  ```
-
-## First Run & Setup
-
-On first boot, Homebridge generates a unique setup code in the logs. Find it with:
-```bash
-docker compose logs homebridge | grep -i "setup code"
+```sh
+docker compose logs application | grep -i "setup code"
 ```
 
-You'll use this code if setting up HomeKit bridges (only if HomeKit discovery were enabled). For web UI access, no setup code is needed.
+You do not need the setup code to open the web UI — it is only used if you were pairing HomeKit bridges (not possible in this stack).
 
-## Configuration
+## Links
 
-### Important Notes
-
-- **ENABLE_AVAHI=0**: Avahi (mDNS daemon) is disabled since the sidecar network prevents proper mDNS broadcasts. HomeKit discovery is not functional in this setup.
-- **Tailscale Serve**: The sidecar automatically proxies port 443 to the Homebridge UI on 8581. HTTPS certificates are auto-provisioned by Tailscale.
-- **Plugins**: Install via the Homebridge UI. They persist in the mounted volume.
-
-### Optional Environment Variables
-
-Add to `compose.yml` under the `homebridge` service `environment:` block if needed:
-- `HB_PORT=8581` — Web UI port (change if desired, but update compose.tailscale.yml Proxy port to match)
-
-## Upstream Documentation
-
-- [Homebridge GitHub](https://github.com/homebridge/homebridge)
-- [Homebridge Docker Guide](https://github.com/homebridge/homebridge/wiki/Install-Homebridge-on-Docker)
-- [Homebridge Plugins](https://www.npmjs.com/search?q=homebridge-plugin)
-- [Homebridge UI](https://github.com/homebridge/homebridge-config-ui-x)
-- [Tailscale Docker Guide](https://tailscale.com/blog/docker-tailscale-guide)
-
-## Troubleshooting
-
-- **Container unhealthy**: Check `docker compose logs tailscale` and `docker compose logs homebridge`
-- **Can't reach UI over HTTPS**: Verify Tailscale connection with `docker compose exec tailscale tailscale status`. If not logged in, check TS_AUTHKEY.
-- **UI timeout or 502**: Ensure Homebridge is running with `docker compose logs homebridge`. Check that internal port 8581 is correct.
-- **HomeKit discovery not working**: This is expected. The sidecar breaks mDNS. Run with `network_mode: host` for full HomeKit support.
+- [Homebridge documentation](https://github.com/homebridge/homebridge)
+- [Homebridge on Docker](https://github.com/homebridge/homebridge/wiki/Install-Homebridge-on-Docker)
+- [Homebridge source code](https://github.com/homebridge/homebridge)

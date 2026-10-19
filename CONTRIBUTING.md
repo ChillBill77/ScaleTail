@@ -6,6 +6,18 @@ The rules on this page apply to new stacks and to the parts of an existing
 stack that you change. Existing stacks are brought in line over time, so you
 do not have to fix the rest of a stack that you touch.
 
+## Tooling
+
+Two scripts automate the workflow below:
+
+- `scripts/scaffold.sh <name> <image> [port]` — copies the service template into
+  `services/<name>/` and fills the `SERVICE`, `IMAGE_URL` and `SERVICEPORT`
+  placeholders in `.env` and `README.md`. Then complete `compose.yaml` and the
+  README as described under "Add a service".
+- `scripts/validate.sh [name ...]` — runs the checks a service must pass before
+  a PR: compose config, required `.env` variables, a committed-credential scan,
+  and the required README sections. With no arguments it checks every service.
+
 ## Add a service
 
 1. Copy the service template from the repository root. Replace `my-service` with your service name:

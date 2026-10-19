@@ -1,27 +1,69 @@
-# Seafile with Tailscale Sidecar Configuration
+# Seafile
 
-This Docker Compose configuration sets up [Seafile Community Edition](https://www.seafile.com/en/product/seafile_on_premise/) with Tailscale as a sidecar container to keep the app reachable over your Tailnet.
+[Seafile Community Edition](https://www.seafile.com/en/product/seafile_on_premise/) is a file synchronisation and sharing platform. You store your files in libraries, synchronise them with the desktop and mobile clients, and share them with others.
 
-## Seafile
+This stack runs Seafile with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Seafile Community Edition](https://www.seafile.com/en/product/seafile_on_premise/) is an open‑source, self‑hosted file syncing and collaboration platform that lets individuals and small teams store, share, and version their files on their own servers. It provides fast, reliable file synchronization and team collaboration features. Think self-hosted OneDrive or Dropbox.
+## At a glance
 
-## Configuration Overview
+| Item          | Value                                                    |
+| ------------- | -------------------------------------------------------- |
+| Web interface | `https://seafile.<tailnet>.ts.net`                       |
+| Service port  | `80`                                                     |
+| Images        | `seafileltd/seafile-mc:13.0-latest`                      |
+|               | `mariadb:10.11`                                          |
+|               | `memcached:1.6.29`                                       |
+| Data          | `./seafile-data` (Seafile, set by `SEAFILE_VOLUME`)      |
+|               | `./db` (MariaDB database, set by `SEAFILE_MYSQL_VOLUME`) |
 
-In this setup, the `tailscale-seafile` service runs Tailscale, which manages secure networking for Seafile. The Seafile service utilizes the Tailscale network stack via Docker's `network_mode: service:` configuration. This keeps the app Tailnet-only unless you intentionally expose ports.
+## Before you start
 
-## Notes
+Set these values in `.env`:
 
-- This configuration is intended for small (single digit) groups of users. It omits the SeaDoc, Collabora and Notification servers, and uses Memcached instead of Redis. You would probably want all of those things in a large deployment.
-- Additional Docker Compose settings for Seafile can be found here: <https://manual.seafile.com/latest/setup/setup_ce_by_docker/>
+- **`SEAFILE_SERVER_HOSTNAME`.** The name of the device on your Tailnet, `seafile.<tailnet>.ts.net`.
+- **`INIT_SEAFILE_MYSQL_ROOT_PASSWORD` and `SEAFILE_MYSQL_DB_PASSWORD`.** The passwords of the database. Use random values of letters and digits. Compose stops with an error if either is empty.
+- **`INIT_SEAFILE_ADMIN_EMAIL` and `INIT_SEAFILE_ADMIN_PASSWORD`.** The administrator account that Seafile creates at the first start. The password is empty, and Compose stops with an error until you set it. The address does not need to exist, unless you configure email notifications later.
+- **`JWT_PRIVATE_KEY`.** A random value. Generate one with `openssl rand -base64 40`.
+- **`SEAFILE_VOLUME` and `SEAFILE_MYSQL_VOLUME`.** The data folders. Change them to store the data elsewhere.
 
-## Files to check
+MariaDB and Seafile apply the database passwords only at the first start.
 
-Please check the following contents for validity as some variables need to be defined upfront.
+## Deviations from the standard setup
 
-- `TS_AUTHKEY`: Paste in an Auth Key for your Tailnet.
-- Volumes: Update the locations for the `SEAFILE_VOLUME` and `SEAFILE_MYSQL_VOLUME` in .ENV.
-- Passwords: There are three passwords (for MySQL/MariaDB and intial Seafile administrator) which need to be set in .ENV.
-- Admin Email: Update `INIT_SEAFILE_ADMIN_EMAIL`. This doesn't have to be a valid email address, although you can configure SMTP notifications in Seafile, which will require a valid email address.
-- `JWT_PRIVATE_KEY`: Generate this by running `pwgen -s 40 1` or `openssl rand -base64 40`
-- `SEAFILE_SERVER_HOSTNAME`: Update the FQDN to match your Tailnet MagicDNS suffix.
+- **Service names.** The application service is called `seafile`, not `application`, and its container is named `app-seafile`.
+- **Extra containers.** The stack runs `db` (MariaDB) and `memcached`. They use the default Compose network, and Seafile reaches them by their service name through Docker's DNS. Keep `TS_ACCEPT_DNS` disabled, because MagicDNS cannot resolve these names.
+- **Images are set in `.env`.** The stack does not use `IMAGE_URL`. `SEAFILE_IMAGE`, `SEAFILE_DB_IMAGE`, and `SEAFILE_MEMCACHED_IMAGE` select the images. Keep the Memcached image on a Debian-based tag, because its health check needs `perl`, which Alpine tags lack.
+- **Small deployment.** The stack is meant for a handful of users. It leaves out the SeaDoc, Collabora, and notification servers, and it uses Memcached instead of Redis.
+- **Data folders.** The data is in `./seafile-data` and `./db`.
+
+## First run
+
+Open the web interface and log in with the administrator account from `.env`.
+
+## Troubleshooting
+
+### Seafile cannot connect to the database
+
+Seafile waits for the database before it starts and logs nothing while it waits. The Seafile container stays up, turns `unhealthy`, and the web interface answers `502 Bad Gateway`. Two causes are common.
+
+**`TS_ACCEPT_DNS=true` is enabled.** With this setting, Tailscale replaces Docker's DNS, and the names `db` and `memcached` no longer resolve. Check whether the names resolve:
+
+```bash
+docker compose exec seafile getent hosts db memcached
+```
+
+If the command prints nothing, comment out `TS_ACCEPT_DNS` in `compose.yaml` and run `docker compose up -d`. Seafile does not need MagicDNS, and Tailscale Serve works without this setting.
+
+**The database passwords changed after the first start.** Later changes in `.env` do not reach the existing database, so Seafile can no longer log in, and `docker logs app-seafile-db` shows `Access denied for user`. Restore the original passwords. On a new installation without data, you can instead stop the stack, delete the folders from `SEAFILE_MYSQL_VOLUME` and `SEAFILE_VOLUME`, and start again.
+
+## Upgrading
+
+Earlier versions of this stack had sample values for `INIT_SEAFILE_MYSQL_ROOT_PASSWORD`, `SEAFILE_MYSQL_DB_PASSWORD`, and `INIT_SEAFILE_ADMIN_PASSWORD` in `.env`. They are now empty, and Compose stops with an error until you set them. If you already run the stack, keep the values that you use now. This is required for the database password, because the database applies it only at the first start. If you kept the sample value, set `SEAFILE_MYSQL_DB_PASSWORD=REPLACE_WITH_RANDOM_ALPHANUMERIC_PASSWORD` again. The database still uses it.
+
+`INIT_SEAFILE_ADMIN_PASSWORD` only creates the administrator at the first start. A new value does not change an existing account. If you kept the sample value, change the password of the administrator in the web interface.
+
+## Links
+
+- [Seafile Docker setup](https://manual.seafile.com/latest/setup/setup_ce_by_docker/)
+- [Seafile administration manual](https://manual.seafile.com/latest/)
+- [Seafile source code](https://github.com/haiwen/seafile)

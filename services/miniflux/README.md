@@ -1,27 +1,42 @@
-# Miniflux with Tailscale Sidecar Configuration
+# Miniflux
 
-This Docker Compose configuration sets up [Miniflux](https://github.com/miniflux/v2) with Tailscale as a sidecar container, enabling secure access to your minimalist feed reader over a private Tailscale network. With this setup, your Miniflux instance remains fully private and accessible only from authorized devices.
+[Miniflux](https://miniflux.app/) is a minimalist feed reader for RSS, Atom, and JSON feeds. It is fast and has a clean interface without distractions.
 
-## Miniflux
+This stack runs Miniflux with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Miniflux](https://miniflux.app/) is a minimalist and opinionated feed reader. It is designed to be fast, simple, and efficient, supporting RSS, Atom, and JSON feeds. Miniflux is focused on reading and offers a clean, distraction-free user interface.
+## At a glance
 
-## Key Features
+| Item          | Value                                      |
+| ------------- | ------------------------------------------ |
+| Web interface | `https://miniflux.<tailnet>.ts.net`        |
+| Service port  | `8080`                                     |
+| Images        | `miniflux/miniflux`                        |
+|               | `postgres:15-alpine`                       |
+| Data          | `./miniflux-data/db` (PostgreSQL database) |
 
-* **Minimalist Design** – Focused purely on readability and efficiency.
-* **Fast & Lightweight** – Written in Go, ensuring high performance and low resource usage.
-* **Feed Support** – Supports RSS, Atom, and JSON feeds.
-* **Privacy Focused** – Removes pixel trackers and ads from articles.
-* **Self-Hosted** – Keep full control of your reading data.
-* **Private by Default with Tailscale** – Secured with Tailscale, accessible only to you.
+## Before you start
 
-## Configuration Overview
+Set these values in `.env`:
 
-In this deployment, the `tailscale-miniflux` service runs the Tailscale client to establish a secure private network. The `miniflux` application and its `postgres` database both use `network_mode: service:tailscale-miniflux`. This means all services share the same network namespace, allowing them to communicate via `localhost` and keeping the application reachable only via the Tailscale network.
+- **`TAILNET_NAME`.** Your Tailnet name with `.ts.net`. `compose.yaml` builds the base address of Miniflux as `https://<SERVICE>.<TAILNET_NAME>`.
+- **`ADMIN_USERNAME` and `ADMIN_PASSWORD`.** The administrator account that Miniflux creates at the first start. The password needs at least six characters.
+- **`POSTGRES_PASSWORD`.** The password of the database. Use letters and digits only, because the database address contains it. Compose stops with an error if `ADMIN_PASSWORD` or `POSTGRES_PASSWORD` is empty.
 
-## Files to check
+## Deviations from the standard setup
 
-Please verify the following files and variables before deploying:
+- **Extra container.** The stack runs a `db` container with PostgreSQL. It uses the network of the `tailscale` container as well, so Miniflux reaches it at `localhost`. PostgreSQL listens only on the loopback address of the device, so other devices on your Tailnet cannot reach it.
+- **Automatic setup.** `RUN_MIGRATIONS=1` and `CREATE_ADMIN=1` make Miniflux prepare the database and create the administrator at the start.
 
-* `.env` — define `SERVICE`, `IMAGE_URL`, `TS_AUTHKEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and database credentials.
-* `compose.yaml` — confirm volume mappings and environment variables.
+## First run
+
+Open the web interface and log in with the administrator account from `.env`.
+
+## Upgrading
+
+Earlier versions listened on all addresses of the device, so PostgreSQL was reachable from your Tailnet. This version makes it listen on localhost only. Your data stays in place. Run `docker compose up -d` to recreate the `db` container. Any tool that connects to the database from another device stops working.
+
+## Links
+
+- [Miniflux documentation](https://miniflux.app/docs/)
+- [Miniflux configuration parameters](https://miniflux.app/docs/configuration.html)
+- [Miniflux source code](https://github.com/miniflux/v2)

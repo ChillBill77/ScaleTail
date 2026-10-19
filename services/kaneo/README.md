@@ -1,19 +1,47 @@
-# Kaneo with Tailscale Sidecar Configuration  
+# Kaneo
 
-This Docker Compose configuration sets up **[Kaneo](https://github.com/usekaneo/kaneo)** with Tailscale as a sidecar container to securely manage and access your self-hosted project management platform over a private Tailscale network. By integrating Tailscale, you ensure that your Kaneo instance is only accessible to authorized devices within your Tailscale network, keeping your tasks, projects, and team discussions private.
+[Kaneo](https://kaneo.app/) is a project management tool with boards, tasks, and a clean interface. It is an open-source alternative to tools such as Trello and Linear.
 
-## Kaneo  
+This stack runs Kaneo with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Kaneo](https://github.com/usekaneo/kaneo) is an **open-source, self-hosted project management platform** focused on simplicity, clean UI, and efficient workflows. Designed as an alternative to tools like Trello or Linear, Kaneo offers a modern and distraction-free environment to manage tasks, organize projects, and collaborate with your team. You can self-host and fully customize the platform to match your workflow—no vendor lock-in, no subscriptions.
+## At a glance
 
-## Key Features  
+| Item          | Value                                              |
+| ------------- | -------------------------------------------------- |
+| Web interface | `https://kaneo.<tailnet>.ts.net`                   |
+| Service port  | `5173`                                             |
+| Images        | `ghcr.io/usekaneo/kaneo`                           |
+|               | `postgres:16-alpine`                               |
+| Data          | `./kaneo-data/postgres_data` (PostgreSQL database) |
 
-- **Project & Task Boards** – Kanban-style boards for managing tasks and workflows.  
-- **Clean & Fast UI** – Minimalist design focused on usability and speed.  
-- **Self-Hosted & Customizable** – Deploy on your own infrastructure and modify freely.  
-- **Privacy-First** – No tracking, no external dependencies.  
-- **Secure Access with Tailscale** – Limit access to authorized devices in your private network.  
+## Before you start
 
-## Configuration Overview  
+Set these values in `.env`:
 
-In this setup, the `tailscale-kaneo` service runs Tailscale, which manages secure networking for the Kaneo service. The `kaneo` service uses the Tailscale network stack via Docker's `network_mode: service:` configuration. This ensures that Kaneo’s web interface is only accessible through the Tailscale network (or locally, if preferred), adding a strong layer of privacy and security to your self-hosted project management platform.
+- **`KANEO_CLIENT_URL`.** The address of the web interface, `https://kaneo.<tailnet>.ts.net`. Kaneo derives the address of its API from it and does not start with the sample value. Recreate the container after you change it.
+- **`AUTH_SECRET` and `DB_PASSWORD`.** Two different random values. Generate each with `openssl rand -hex 32`. Compose stops with an error if one of them is empty.
+
+## Deviations from the standard setup
+
+- **Extra container.** The stack runs a `postgres` container. It uses the network of the `tailscale` container as well, so Kaneo reaches it at `localhost`. PostgreSQL listens only on the loopback address of the device, so other devices on your Tailnet cannot reach it.
+- **Serve port from `.env`.** The Tailscale Serve configuration in `compose.yaml` takes its port from `SERVICEPORT`.
+- **Database image.** `IMAGE_URL_DATABASE` in `.env` selects the PostgreSQL image.
+- **The containers read the whole `.env` file.** Both containers load `.env` through `env_file`. Every variable in that file, including `TS_AUTHKEY`, is therefore present in their environment.
+
+## First run
+
+Open the web interface and sign up to create the first account. Then create your workspace.
+
+## Upgrading
+
+Since [release v2.7.0](https://github.com/usekaneo/kaneo/releases/tag/v2.7.0), Kaneo is a single image. Earlier versions of this stack ran a `frontend` and a `backend` container. See [Upgrade Kaneo](https://kaneo.app/docs/core/operations/upgrades) in the upstream documentation.
+
+When you update from such a version, start the stack with `docker compose up -d --remove-orphans`. Compose then removes the old `frontend` and `backend` containers, which use the same ports as the new container.
+
+Earlier versions listened on all addresses of the device, so PostgreSQL was reachable from your Tailnet. This version makes it listen on localhost only. Your data stays in place. Run `docker compose up -d` to recreate the `postgres` container. Any tool that connects to the database from another device stops working.
+
+## Links
+
+- [Kaneo documentation](https://kaneo.app/docs)
+- [Kaneo Docker Compose installation](https://kaneo.app/docs/core/installation/docker-compose)
+- [Kaneo source code](https://github.com/usekaneo/kaneo)

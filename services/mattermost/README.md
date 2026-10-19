@@ -1,36 +1,54 @@
-# Mattermost with Tailscale Sidecar Configuration
+# Mattermost
 
-This Docker Compose configuration sets up [Mattermost](https://mattermost.com/platform-overview/) with Tailscale as a sidecar container to securely manage and access your clipboard history over a private Tailscale network. By integrating Tailscale, you can ensure that your Mattermost instance remains private and accessible only to authorized devices on your Tailscale network.
+[Mattermost](https://mattermost.com/) is a collaboration platform for teams, with channels, direct messages, file sharing, and integrations. It is an open-source alternative to Slack.
 
-## Mattermost
+This stack runs Mattermost with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Mattermost](https://mattermost.com/platform-overview/) is an open-source, self-hosted collaboration platform for secure team communication and workflow automation, functioning as a secure alternative to Slack. It provides tools for chat, file sharing, and integrations, with an emphasis on data control and security for enterprise use, especially in high-stakes sectors like defense and critical infrastructure. The platform is designed for flexibility and extensibility, allowing for deep customization and integration with other tools and processes to manage complex workflows.
+## At a glance
 
-## Key Features
+| Item          | Value                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------- |
+| Web interface | `https://mattermost.<tailnet>.ts.net`                                                                     |
+| Service port  | `8065`                                                                                                    |
+| Images        | `mattermost/mattermost-team-edition`                                                                      |
+|               | `postgres:17-alpine`                                                                                      |
+| Data          | `./mattermost-data/config`, `data`, `logs`, `plugins`, `client/plugins`, and `bleve-indexes` (Mattermost) |
+|               | `./mattermost-data/postgres/data` (PostgreSQL database)                                                   |
 
-- **Secure Messaging**: Offers public and private channels, direct messaging, and secure file sharing within teams and organizations.
-- **Workflow Automation**: Includes features like Playbooks to streamline and automate complex processes and tasks.
-- **Self-Hosting & Data Control**: Built to be self-hosted, giving IT administrators full control over data, security, and the platform's infrastructure.
-- **Open-Source & Open Core**: Features an open-source core with an open-source edition and commercial, subscription-based editions that add advanced capabilities.
-- **Extensive Integrations**: Designed for seamless integration with development tools and other enterprise software, such as GitLab.
-- **Multi-Platform Support**: Available as web, desktop, and mobile applications for iOS, Android, Windows, and macOS.
+## Before you start
 
-## Configuration Overview
+1. Create the Mattermost folders yourself and make user `2000` their owner. Docker creates missing folders as user `root`. The Mattermost image runs as user and group `2000` and then fails with `could not create config file: open /mattermost/config/config.json: permission denied`. Do not change the owner of the `postgres` folder, which PostgreSQL manages itself.
 
-In this setup, the `tailscale-Mattermost` service runs Tailscale, which manages secure networking for the Mattermost service. The `Mattermost` service uses the Tailscale network stack via Docker's `network_mode: service:` configuration. This ensures that Mattermost’s web interface and functionality are only accessible through the Tailscale network (or locally, if preferred), providing enhanced privacy and security for managing your clipboard history.
+   ```bash
+   DATA_DIR=mattermost-data
+   mkdir -p "$DATA_DIR"/{config,data,logs,plugins,client/plugins,bleve-indexes}
+   sudo chown -R 2000:2000 "$DATA_DIR"/{config,data,logs,plugins,client,bleve-indexes}
+   ```
 
-## Troubleshooting
+   If you changed `SERVICE` in `.env`, set `DATA_DIR` to `<SERVICE>-data`.
 
-After initial start-up you may experience an error.
+2. Set these values in `.env`:
 
-```plain
-app-mattermost        | Error: failed to load configuration: could not create config file: open /mattermost/config/config.json: permission denied
-```
+   - **`DOMAIN`.** The name of the device on your Tailnet, `mattermost.<tailnet>.ts.net`. The stack builds the site address, `MM_SERVICESETTINGS_SITEURL`, from it.
+   - **`POSTGRES_USER` and `POSTGRES_PASSWORD`.** The login of the database. `POSTGRES_PASSWORD` is empty, and Compose stops with an error until you set it. Use letters and digits only, because the database address contains it.
 
-Please adjust the permissions of the newly created folder `mattermost-data/` with the following command and restart the service.
+## Deviations from the standard setup
 
-```bash
-chown -R 2000:2000 mattermost-data/
-```
+- **Extra container.** The stack runs a `database` container with PostgreSQL, named `db-mattermost`. It uses the default Compose network, and Mattermost reaches it by its service name through Docker's DNS. Keep `TS_ACCEPT_DNS` disabled, because MagicDNS cannot resolve that name.
+- **Data paths in `.env`.** The `*_PATH` variables in `.env` set the data folders. They are relative to this directory.
+- **Reduced privileges.** Both containers set `no-new-privileges` and a limit on the number of processes. The database container has a read-only file system.
+- **Service port.** Mattermost listens on port `8065`. `SERVICEPORT` in `.env` is only used by the optional `ports` block.
 
-Reference - [Starting/Stopping Docker](https://github.com/mattermost/mattermost-docker/commit/37331ba3d7122aeb30272308dddf51ef70e2134c#diff-b335630551682c19a781afebcf4d07bf978fb1f8ac04c6bf87428ed5106870f5L146)
+## First run
+
+Open the web interface and create the first account, which becomes the system administrator. Then create your team.
+
+## Upgrading
+
+Earlier versions of this stack had a sample value for `POSTGRES_PASSWORD` in `.env`. It is now empty, and Compose stops with an error until you set it. If you already run the stack, keep the values that you use now. This is required for the database password, because the database applies it only at the first start. If you kept the sample value, set `POSTGRES_PASSWORD=MMus3r_P4ssword` again. The database still uses it.
+
+## Links
+
+- [Mattermost documentation](https://docs.mattermost.com/)
+- [Mattermost Docker deployment](https://docs.mattermost.com/deployment-guide/server/deploy-containers.html)
+- [Mattermost source code](https://github.com/mattermost/mattermost)

@@ -1,11 +1,34 @@
-# ConvertX with Tailscale Sidecar Configuration
+# ConvertX
 
-This Docker Compose configuration sets up [ConvertX](https://github.com/C4illin/ConvertX) with Tailscale as a sidecar container to securely access your media conversion tool over a private Tailscale network. By using Tailscale in a sidecar configuration, you can enhance the security and privacy of your ConvertX instance, ensuring that it is only accessible within your Tailscale network.
+[ConvertX](https://github.com/C4illin/ConvertX) is a file converter that runs in your browser. It converts documents, images, audio, video, and many other formats on your own server.
 
-## ConvertX
+This stack runs ConvertX with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[ConvertX](https://github.com/C4illin/ConvertX) is a self-hosted, user-friendly media conversion tool designed to automate the process of converting media files using hardware acceleration where available. It supports batch conversion and integrates smoothly with media server workflows. This setup uses Tailscale to expose your ConvertX instance only to trusted devices within your private Tailscale network, keeping the web interface protected from public access.
+## At a glance
 
-## Configuration Overview
+| Item          | Value                               |
+| ------------- | ----------------------------------- |
+| Web interface | `https://convertx.<tailnet>.ts.net` |
+| Service port  | `3000`                              |
+| Image         | `ghcr.io/c4illin/convertx`          |
+| Data          | `./convertx-data`                   |
 
-In this setup, the `tailscale-convertx` service runs Tailscale, which manages secure networking for the ConvertX service. The `convertx` service uses the Tailscale network stack via Docker's `network_mode: service:` configuration. This ensures that ConvertX’s web interface is only accessible through the Tailscale network (or locally, if preferred), providing an additional layer of security and privacy for your self-hosted media conversion workflow.
+## Before you start
+
+Set `JWT_SECRET` in `.env` to a long random value. Generate one with `openssl rand -hex 32`. ConvertX uses it to sign the login tokens, and Compose stops with an error if it is empty.
+
+## Deviations from the standard setup
+
+None.
+
+## First run
+
+Open the web interface. ConvertX sends you to the setup page, where you create your account. Do this right after the first start, because anyone who can reach the service can register the first account. After that, registration is closed.
+
+## Upgrading
+
+Earlier versions of this stack had a sample value for `JWT_SECRET` in `compose.yaml`. It is now empty in `.env`, and you must set it. With a new value, everyone has to log in again.
+
+## Links
+
+- [ConvertX documentation and source code](https://github.com/C4illin/ConvertX)

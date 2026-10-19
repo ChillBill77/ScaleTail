@@ -1,19 +1,34 @@
-# Nanote with Tailscale Sidecar Configuration  
+# Nanote
 
-This Docker Compose configuration sets up **[Nanote](https://github.com/omarmir/nanote)** with Tailscale as a sidecar container to securely manage and access your self-hosted note-taking application over a private Tailscale network. By integrating Tailscale, you can ensure that your Nanote instance remains private and accessible only to authorized devices within your Tailscale network.
+[Nanote](https://github.com/omarmir/nanote) is a lightweight note-taking application. It stores your notes as Markdown files in folders, so that you can use them with other tools as well.
 
-## Nanote  
+This stack runs Nanote with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Nanote](https://github.com/omarmir/nanote) is a lightweight, self-hosted note-taking application designed for simplicity and speed. It provides a distraction-free environment to jot down quick notes, ideas, or reminders without the complexity of traditional note-taking apps. By integrating Tailscale, you can keep your Nanote instance secure and accessible only within your private network.
+## At a glance
 
-## Key Features  
+| Item          | Value                                          |
+| ------------- | ---------------------------------------------- |
+| Web interface | `https://nanote.<tailnet>.ts.net`              |
+| Service port  | `3000`                                         |
+| Image         | `omarmir/nanote`                               |
+| Data          | `./nanote-data` (your notes as Markdown files) |
 
-- **Minimalist Design** – A clean and distraction-free interface for note-taking.  
-- **Fast & Lightweight** – Optimized for quick note-taking without unnecessary bloat.  
-- **Self-Hosted Privacy** – Keep your notes secure and under your control.  
-- **Markdown Support** – Write notes in Markdown for easy formatting.  
-- **Secure Access with Tailscale** – Restrict access to only authorized devices within your private network.  
+## Before you start
 
-## Configuration Overview  
+Set `SECRET_KEY` in `.env` to your own secret, for example from `openssl rand -hex 32`. Nanote uses it as the key to log in. Compose stops with an error if it is empty.
 
-In this setup, the `tailscale-nanote` service runs Tailscale, which manages secure networking for the Nanote service. The `nanote` service uses the Tailscale network stack via Docker's `network_mode: service:` configuration. This ensures that Nanote’s web interface and note storage are only accessible through the Tailscale network (or locally, if preferred), adding an extra layer of security and privacy to your note-taking workflow.
+## Deviations from the standard setup
+
+None.
+
+## First run
+
+Open the web interface and log in with the value of `SECRET_KEY`.
+
+## Upgrading
+
+Earlier versions of this stack had the sample value `<yourkey>` for `SECRET_KEY` in `compose.yaml`. The key is now in `.env`. It is empty, and Compose stops with an error until you set it. If you already run the stack, set it to the key that you use now. If you kept the sample value, choose a new key. Nanote does not store the key, so you only have to log in again.
+
+## Links
+
+- [Nanote documentation and source code](https://github.com/omarmir/nanote)

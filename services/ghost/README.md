@@ -1,19 +1,40 @@
-# Ghost with Tailscale Sidecar Configuration  
+# Ghost
 
-This Docker Compose configuration sets up **[Ghost](https://github.com/TryGhost/Ghost)** with Tailscale as a sidecar container to securely manage and access your self-hosted publishing platform over a private Tailscale network. By integrating Tailscale, you can ensure that your Ghost instance remains private and accessible only to authorized devices within your Tailscale network.
+[Ghost](https://ghost.org/) is a publishing platform for blogs, newsletters, and online publications.
 
-## Ghost  
+This stack runs Ghost with a Tailscale sidecar, as described in [the standard setup](../../documentation/standard-setup.md).
 
-[Ghost](https://github.com/TryGhost/Ghost) is a modern, open-source publishing platform designed for professional blogs, newsletters, and online publications. It provides a sleek, minimalist editor, built-in SEO features, and powerful customization options. By integrating Tailscale, your Ghost instance remains secure and accessible only to authorized users, ensuring that your content is managed in a private environment.
+## At a glance
 
-## Key Features  
+| Item          | Value                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| Web interface | `https://ghost.<tailnet>.ts.net` (site) and `https://ghost.<tailnet>.ts.net/ghost` (administration) |
+| Service port  | `2368`                                                                                              |
+| Images        | `ghost:5-alpine`                                                                                    |
+|               | `mysql:8.0`                                                                                         |
+| Data          | `./ghost-data/ghost` (themes, images, and settings)                                                 |
+|               | `./ghost-data/db` (MySQL database)                                                                  |
 
-- **Minimalist & Fast** – A lightweight, streamlined writing experience for bloggers and content creators.  
-- **Built-in SEO & Analytics** – Optimize content for search engines and track performance effortlessly.  
-- **Customizable Themes & Integrations** – Extend Ghost with themes, memberships, and integrations.  
-- **Self-Hosted Privacy** – Maintain full control over your content with a locally hosted instance.  
-- **Secure Access with Tailscale** – Restrict access to only authorized devices within your private network.  
+## Before you start
 
-## Configuration Overview  
+- **Set `GHOST_URL` in `.env`.** Use the address of the site, `https://ghost.<tailnet>.ts.net`. Ghost does not start with the sample value and reports `Invalid URL`.
+- **Set `MYSQL_ROOT_PASSWORD` in `.env`.** The password of the MySQL `root` user, which Ghost uses to connect to the database. Compose stops with an error if it is empty.
 
-In this setup, the `tailscale-ghost` service runs Tailscale, which manages secure networking for the Ghost service. The `ghost` service uses the Tailscale network stack via Docker's `network_mode: service:` configuration. This ensures that Ghost’s web interface and publishing tools are only accessible through the Tailscale network (or locally, if preferred), adding an extra layer of security and privacy to your publishing workflow.
+## Deviations from the standard setup
+
+- **Extra container.** The stack runs a `db` container with MySQL, named `db-ghost`. It uses the default Compose network, and Ghost reaches it by its service name through Docker's DNS. Keep `TS_ACCEPT_DNS` disabled, because MagicDNS cannot resolve that name.
+- **Service port.** Ghost listens on port `2368`. `SERVICEPORT` in `.env` is only the host port of the optional `ports` block.
+
+## First run
+
+Open `https://ghost.<tailnet>.ts.net/ghost` and create the first account, which becomes the owner of the site.
+
+## Upgrading
+
+Earlier versions of this stack had the password `example` for the MySQL `root` user in `compose.yaml`. The password is now `MYSQL_ROOT_PASSWORD` in `.env`. It is empty, and Compose stops with an error until you set it. If you already run the stack, set it to the password that you use now, because the database applies it only at the first start. If you kept the sample value, set `MYSQL_ROOT_PASSWORD=example` again. The database still uses it.
+
+## Links
+
+- [Ghost documentation](https://ghost.org/docs/)
+- [Ghost Docker image](https://hub.docker.com/_/ghost)
+- [Ghost source code](https://github.com/TryGhost/Ghost)
